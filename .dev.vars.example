@@ -1,0 +1,10 @@
+# Copy to .dev.vars for `wrangler pages dev` (Cloudflare local dev)
+# These mirror .env.local — Cloudflare uses .dev.vars instead of .env.local
+
+AUTH_GITHUB_ID=
+AUTH_GITHUB_SECRET=
+AUTH_SECRET=
+GITHUB_USERNAME=
+GITHUB_PAT=
+GITHUB_OWNER=
+GITHUB_REPO=notes
