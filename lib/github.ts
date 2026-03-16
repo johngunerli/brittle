@@ -59,7 +59,7 @@ export interface SearchResult {
 async function fetchIndex(): Promise<{ data: NoteIndex; sha: string | undefined }> {
   const res = await fetch(
     `${GITHUB_API}/repos/${owner()}/${repo()}/contents/${INDEX_PATH}`,
-    { headers: h(), cache: 'no-store' }
+    { headers: h() }
   );
   if (res.status === 404) return { data: {}, sha: undefined };
   if (!res.ok) throw new Error(`Index fetch failed: ${res.status}`);
@@ -89,7 +89,7 @@ export async function listNotes(): Promise<NoteMeta[]> {
   // Get file tree (one call, recursive)
   const treeRes = await fetch(
     `${GITHUB_API}/repos/${owner()}/${repo()}/git/trees/HEAD?recursive=1`,
-    { headers: h(), cache: 'no-store' }
+    { headers: h() }
   );
   if (treeRes.status === 404 || treeRes.status === 409) return [];
   if (!treeRes.ok) throw new Error(`Tree fetch failed: ${treeRes.status}`);
@@ -125,7 +125,7 @@ export async function listNotes(): Promise<NoteMeta[]> {
 export async function getNote(slug: string): Promise<Note> {
   const res = await fetch(
     `${GITHUB_API}/repos/${owner()}/${repo()}/contents/notes/${slug}.md`,
-    { headers: h(), cache: 'no-store' }
+    { headers: h() }
   );
   if (!res.ok) throw new Error(`Note not found: ${slug}`);
   const file = await res.json() as { content: string; sha: string };
@@ -200,7 +200,7 @@ export async function searchNotes(query: string): Promise<SearchResult[]> {
       ...h(),
       Accept: 'application/vnd.github.text-match+json',
     },
-    cache: 'no-store',
+    
   });
   if (!res.ok) return [];
 
@@ -228,7 +228,7 @@ export async function uploadAsset(
   let existingSha: string | undefined;
   const check = await fetch(`${GITHUB_API}/repos/${owner()}/${repo()}/contents/${path}`, {
     headers: h(),
-    cache: 'no-store',
+    
   });
   if (check.ok) {
     const existing = await check.json() as { sha: string };
@@ -252,7 +252,7 @@ export async function getAsset(assetPath: string): Promise<{ data: Uint8Array; c
   const fullPath = `notes/${assetPath}`;
   const res = await fetch(
     `${GITHUB_API}/repos/${owner()}/${repo()}/contents/${fullPath}`,
-    { headers: h(), cache: 'no-store' }
+    { headers: h() }
   );
   if (!res.ok) throw new Error(`Asset not found: ${assetPath}`);
   const file = await res.json() as { content: string; encoding: string };

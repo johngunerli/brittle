@@ -10,27 +10,39 @@ export async function GET(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { slug } = await params;
-  const note = await getNote(decodeURIComponent(slug));
-  return NextResponse.json(note);
+  try {
+    const { slug } = await params;
+    const note = await getNote(decodeURIComponent(slug));
+    return NextResponse.json(note);
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }
 
 export async function PUT(req: Request, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { slug } = await params;
-  const { content, sha } = await req.json() as { content: string; sha?: string };
-  const result = await saveNote(decodeURIComponent(slug), content, sha);
-  return NextResponse.json(result);
+  try {
+    const { slug } = await params;
+    const { content, sha } = await req.json() as { content: string; sha?: string };
+    const result = await saveNote(decodeURIComponent(slug), content, sha);
+    return NextResponse.json(result);
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: Request, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { slug } = await params;
-  const { sha } = await req.json() as { sha: string };
-  await deleteNote(decodeURIComponent(slug), sha);
-  return NextResponse.json({ ok: true });
+  try {
+    const { slug } = await params;
+    const { sha } = await req.json() as { sha: string };
+    await deleteNote(decodeURIComponent(slug), sha);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }
