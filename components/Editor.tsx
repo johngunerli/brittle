@@ -14,6 +14,7 @@ interface Props {
   notes: NoteMeta[];
   onChange: (value: string) => void;
   onSave: () => void;
+  onRename: (to: string) => void;
   onDelete: () => void;
   onNavigate: (slug: string) => void;
 }
@@ -27,9 +28,9 @@ const statusText  = { saved: 'Saved', saving: 'Saving…', unsaved: 'Unsaved' };
 
 export default function Editor({
   slug, content, loading, saveStatus, notes,
-  onChange, onSave, onDelete, onNavigate,
+  onChange, onSave, onRename, onDelete, onNavigate,
 }: Props) {
-  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
+  const [mode, setMode] = useState<'edit' | 'preview'>('preview');
   const textareaRef    = useRef<HTMLTextAreaElement>(null);
 
   // Backlinks — notes whose `links` array includes this slug
@@ -124,6 +125,54 @@ export default function Editor({
             className="px-3 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-default transition-colors"
           >
             Save
+          </button>
+          <button
+            onClick={async () => {
+              const blogSlug = prompt('Blog slug (URL: /blog/<slug>)', slug.split('/').pop() ?? slug);
+              if (blogSlug === null) return;
+              const title = prompt('Blog title', '');
+              if (title === null) return;
+              const date = prompt('Blog date (e.g. March 2026)', '');
+              if (date === null) return;
+              const meta = prompt('Meta string (comma-separated)', '');
+              if (meta === null) return;
+              const tagsRaw = prompt('Tags (comma-separated)', '');
+              if (tagsRaw === null) return;
+              const tags = tagsRaw.split(',').map((t) => t.trim()).filter(Boolean);
+
+              const res = await fetch('/api/export-blog', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  noteSlug: slug,
+                  blogSlug: blogSlug.trim() || undefined,
+                  title: title.trim() || undefined,
+                  date: date.trim() || undefined,
+                  meta: meta.trim() || undefined,
+                  tags: tags.length ? tags : undefined,
+                }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                alert(data.error ?? 'Export failed');
+                return;
+              }
+              alert(`Exported to blog as /blog/${data.slug}`);
+            }}
+            className="px-3 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+            title="Export this note to your blog repo"
+          >
+            Export
+          </button>
+          <button
+            onClick={() => {
+              const next = prompt('Rename / move note to slug (e.g. folder/new-name)', slug);
+              if (!next) return;
+              onRename(next);
+            }}
+            className="px-3 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Rename
           </button>
           <button
             onClick={onDelete}

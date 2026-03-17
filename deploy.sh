@@ -24,6 +24,6 @@ echo "→ Building for Cloudflare Pages..."
 npx @cloudflare/next-on-pages
 
 echo "→ Deploying to Cloudflare Pages (project: $PROJECT)..."
-wrangler pages deploy .vercel/output/static --project-name="$PROJECT"
+npx wrangler pages deploy .vercel/output/static --project-name="$PROJECT"
 
 echo "✓ Deployed."

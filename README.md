@@ -54,7 +54,7 @@ Go to [github.com/settings/tokens](https://github.com/settings/tokens) → **Fin
 ### 4. Local development
 
 ```bash
-cp .env.local.example .env.local
+cp .env.local.example .env
 # fill in all values
 npm install
 npm run dev
@@ -122,6 +122,85 @@ owner: your-username
 repo: notes
 path: notes/        ← all note files live here
 ```
+
+## Export notes to your blog
+
+If your blog repo has a `data/posts.js` file shaped like:
+
+```js
+const posts = {
+	'my-slug': { title, date, meta, tags, body: `<p>...</p>` },
+};
+```
+
+You can export a note directly into that file from the editor via the **Export** button.
+
+### Required env vars
+
+Add these to `.env.local` (and Cloudflare Pages secrets/vars):
+
+- `BLOG_GITHUB_OWNER` (e.g. `johngunerli`)
+- `BLOG_GITHUB_REPO` (e.g. `johngunerli.com`)
+- `BLOG_POSTS_PATH` (defaults to `data/posts.js`)
+
+### Set the vars on Cloudflare Pages (production)
+
+Your deployed site runs on Cloudflare’s edge, so it **won’t** see your local `.env.local` values.
+You need to set the vars on your Pages project.
+
+#### Option A: Cloudflare Dashboard (fastest)
+
+Cloudflare → **Pages** → your project → **Settings** → **Environment variables**.
+
+Add (at least in the **Production** environment):
+
+- `BLOG_GITHUB_OWNER` = `johngunerli`
+- `BLOG_GITHUB_REPO` = `johngunerli.com`
+- `BLOG_POSTS_PATH` = `data/posts.js`
+
+Then redeploy.
+
+#### Option B: Wrangler CLI
+
+1) Make sure you’re logged in:
+
+```bash
+npx wrangler login
+```
+
+1) Set the values.
+
+Cloudflare Pages has both **secrets** (encrypted) and **plain vars**.
+These `BLOG_*` values aren’t sensitive, so plain vars are fine — but using secrets is also OK.
+
+If you want secrets:
+
+```bash
+npx wrangler pages secret put BLOG_GITHUB_OWNER --project-name=brittle
+npx wrangler pages secret put BLOG_GITHUB_REPO  --project-name=brittle
+npx wrangler pages secret put BLOG_POSTS_PATH   --project-name=brittle
+```
+
+If you prefer plain (non-secret) vars, set them in the Dashboard instead (Wrangler’s support for non-secret Pages vars has changed over time).
+
+1) Redeploy:
+
+```bash
+./deploy.sh brittle
+```
+
+### GitHub token permissions
+
+Your `GITHUB_PAT` must have **Contents: Read/Write** on **both**:
+
+- your notes repo
+- your blog repo
+
+If export still fails after setting the vars:
+
+- Confirm `GITHUB_PAT` is set in Cloudflare Pages (it’s required for both reading notes and writing to the blog repo).
+- Confirm the PAT has access to **both** repos (fine-grained tokens are repo-scoped).
+- Confirm `BLOG_POSTS_PATH` points to the right file (default is `data/posts.js`).
 
 ## License
 

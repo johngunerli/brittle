@@ -1,9 +1,12 @@
 // All GitHub API calls — server-side only (edge-compatible, no Node.js built-ins).
 
 import { parseTitle, parseTags, parseLinks } from './parse';
+import type { FolderIndex } from './folders';
+import { normalizePath, resolveFileMeta } from './folders';
 
 const GITHUB_API = 'https://api.github.com';
 const INDEX_PATH = 'notes/_index.json';
+const FOLDERS_PATH = 'notes/_folders.json';
 
 function h() {
   return {
@@ -34,6 +37,10 @@ export interface NoteMeta {
   title: string;
   tags: string[];
   links: string[];
+
+  // UI-only metadata (folder/file labels). Not persisted in notes/_index.json.
+  color?: string;
+  folderTags?: string[];
 }
 
 export interface Note extends NoteMeta {
@@ -83,6 +90,47 @@ async function saveIndex(data: NoteIndex, sha: string | undefined): Promise<void
   });
 }
 
+// ─── Folder/File Metadata ───────────────────────────────────────────────────
+
+async function fetchFolderIndex(): Promise<{ data: FolderIndex; sha: string | undefined }> {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner()}/${repo()}/contents/${FOLDERS_PATH}`,
+    { headers: h() }
+  );
+  if (res.status === 404) return { data: {}, sha: undefined };
+  if (!res.ok) throw new Error(`Folder index fetch failed: ${res.status}`);
+  const file = await res.json() as { content: string; sha: string };
+  try {
+    return { data: JSON.parse(decode(file.content)), sha: file.sha };
+  } catch {
+    return { data: {}, sha: file.sha };
+  }
+}
+
+async function saveFolderIndex(data: FolderIndex, sha: string | undefined): Promise<void> {
+  await fetch(`${GITHUB_API}/repos/${owner()}/${repo()}/contents/${FOLDERS_PATH}`, {
+    method: 'PUT',
+    headers: h(),
+    body: JSON.stringify({
+      message: 'chore: update folder metadata',
+      content: encode(JSON.stringify(data, null, 2)),
+      ...(sha ? { sha } : {}),
+    }),
+  });
+}
+
+export async function getFolderMetadata(): Promise<{ index: FolderIndex; sha?: string }> {
+  const { data, sha } = await fetchFolderIndex();
+  return { index: data, sha };
+}
+
+export async function updateFolderMetadata(index: FolderIndex, sha?: string): Promise<{ sha: string }> {
+  await saveFolderIndex(index, sha);
+  // Re-fetch to return the new sha (GitHub doesn't return sha on PUT in a stable shape)
+  const latest = await fetchFolderIndex();
+  return { sha: latest.sha ?? '' };
+}
+
 // ─── Notes ────────────────────────────────────────────────────────────────────
 
 export async function listNotes(): Promise<NoteMeta[]> {
@@ -109,15 +157,21 @@ export async function listNotes(): Promise<NoteMeta[]> {
   // Enrich with index metadata
   const { data: index } = await fetchIndex();
 
+  // Merge in folder/file metadata (color/tags)
+  const { data: folderIndex } = await fetchFolderIndex();
+
   return files.map((f) => {
     const slug = f.path.replace(/^notes\//, '').replace(/\.md$/, '');
     const meta = index[slug];
+    const resolved = resolveFileMeta(folderIndex, slug);
     return {
       slug,
       sha: f.sha,
       title: meta?.title ?? slug,
       tags: meta?.tags ?? [],
       links: meta?.links ?? [],
+      color: resolved.color,
+      folderTags: resolved.tags,
     };
   });
 }
@@ -189,6 +243,68 @@ export async function deleteNote(slug: string, sha: string): Promise<void> {
   const { data: index, sha: indexSha } = await fetchIndex();
   delete index[slug];
   await saveIndex(index, indexSha);
+}
+
+/**
+ * Rename / move a note across folders by creating the new path then deleting the old.
+ *
+ * Notes are stored as markdown files under `notes/<slug>.md`.
+ *
+ * - If `to` already exists, the GitHub API will reject the create.
+ * - If `sha` is provided, it is used for the delete call; otherwise we fetch the note.
+ */
+export async function moveNote(
+  from: string,
+  to: string,
+  sha?: string
+): Promise<{ sha: string }> {
+  const normFrom = normalizePath(from);
+  const normTo = normalizePath(to);
+
+  // Fetch content (and sha if not supplied)
+  const existing = await getNote(normFrom);
+  const fromSha = sha ?? existing.sha;
+
+  // Create new note first (so failure doesn't delete the old)
+  const createRes = await fetch(
+    `${GITHUB_API}/repos/${owner()}/${repo()}/contents/notes/${normTo}.md`,
+    {
+      method: 'PUT',
+      headers: h(),
+      body: JSON.stringify({
+        message: `move: ${normFrom} -> ${normTo}`,
+        content: encode(existing.content),
+      }),
+    }
+  );
+  if (!createRes.ok) throw new Error(`Failed to create destination note: ${await createRes.text()}`);
+  const createData = await createRes.json() as { content: { sha: string } };
+  const newSha = createData.content.sha;
+
+  // Delete old note
+  await deleteNote(normFrom, fromSha);
+
+  // Ensure destination index entry reflects the new slug + sha
+  const { data: index, sha: indexSha } = await fetchIndex();
+  index[normTo] = {
+    sha: newSha,
+    title: parseTitle(existing.content),
+    tags: parseTags(existing.content),
+    links: parseLinks(existing.content),
+  };
+  await saveIndex(index, indexSha);
+
+  // Move file-level metadata if present
+  const { data: folderIndex, sha: folderSha } = await fetchFolderIndex();
+  const filesMeta = folderIndex.files ?? {};
+  if (filesMeta[normFrom]) {
+    filesMeta[normTo] = filesMeta[normFrom];
+    delete filesMeta[normFrom];
+    folderIndex.files = filesMeta;
+    await saveFolderIndex(folderIndex, folderSha);
+  }
+
+  return { sha: newSha };
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
