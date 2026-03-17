@@ -20,6 +20,20 @@ set -euo pipefail
 
 PROJECT="${1:-brittle}"
 
+# ─── Sync secrets from .env.local ─────────────────────────────────────────────
+if [ -f .env.local ]; then
+  echo "→ Pushing secrets from .env.local to Cloudflare Pages..."
+  SECRETS=(AUTH_GITHUB_ID AUTH_GITHUB_SECRET AUTH_SECRET GITHUB_USERNAME GITHUB_PAT GITHUB_OWNER GITHUB_REPO)
+  for KEY in "${SECRETS[@]}"; do
+    VALUE=$(grep -E "^${KEY}=" .env.local | cut -d= -f2-)
+    if [ -n "$VALUE" ]; then
+      echo "$VALUE" | npx wrangler pages secret put "$KEY" --project-name="$PROJECT"
+    else
+      echo "  ⚠ Skipping $KEY (not set in .env.local)"
+    fi
+  done
+fi
+
 echo "→ Building for Cloudflare Pages..."
 npx @cloudflare/next-on-pages
 
