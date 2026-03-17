@@ -23,7 +23,7 @@ PROJECT="${1:-brittle}"
 # ─── Sync secrets from .env.local ─────────────────────────────────────────────
 if [ -f .env.local ]; then
   echo "→ Pushing secrets from .env.local to Cloudflare Pages..."
-  SECRETS=(AUTH_GITHUB_ID AUTH_GITHUB_SECRET AUTH_SECRET GITHUB_USERNAME GITHUB_PAT GITHUB_OWNER GITHUB_REPO)
+  SECRETS=(AUTH_GITHUB_ID AUTH_GITHUB_SECRET AUTH_SECRET GITHUB_USERNAME GITHUB_PAT GITHUB_OWNER GITHUB_REPO BLOG_GITHUB_OWNER BLOG_GITHUB_REPO BLOG_POSTS_PATH)
   for KEY in "${SECRETS[@]}"; do
     VALUE=$(grep -E "^${KEY}=" .env.local | cut -d= -f2-)
     if [ -n "$VALUE" ]; then
