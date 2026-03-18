@@ -202,6 +202,11 @@ If export still fails after setting the vars:
 - Confirm the PAT has access to **both** repos (fine-grained tokens are repo-scoped).
 - Confirm `BLOG_POSTS_PATH` points to the right file (default is `data/posts.js`).
 
+## Authors
+
+- [johngunerli](https://github.com/johngunerli)
+- [Claude](https://claude.ai) (Anthropic) — AI co-author
+
 ## License
 
 MIT
